@@ -74,7 +74,11 @@ body.unminus {
 		display: none;
 	}
 
-	.hidden {
+	figure:has(img[src^="https://plus.unsplash.com"]) {
+		display: none;
+	}
+
+	.minus-unsplash-plus {
 		display: none;
 	}
 }

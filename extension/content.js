@@ -1,43 +1,56 @@
-// If first launch, add isOn
-chrome.storage.local.get(["isOn"], function (result) {
-	if (result.isOn === undefined)
-		chrome.storage.local.set({
-			isOn: true,
-		})
-})
+const plusImageSelector = 'img[src^="https://plus.unsplash.com"]'
 
-function setState(state) {
-	if (state) document.body.classList.add("unminus")
-	else document.body.classList.remove("unminus")
-}
+// Older Firefox versions supported by this extension lack :has().
+if (!CSS.supports("selector(:has(*))")) {
+	const collectFigures = (node, figures) => {
+		for (let figure = node.closest("figure"); figure; figure = figure.parentElement?.closest("figure")) {
+			figures.add(figure)
+		}
+	}
+	const updateFigure = (figure) => {
+		figure.classList.toggle("minus-unsplash-plus", !!figure.querySelector(plusImageSelector))
+	}
 
-// add .unminus to body if enabled
-chrome.storage.local.get(["isOn"], function (result) {
-	setState(result.isOn)
-})
+	const initialFigures = new Set()
+	document.querySelectorAll(plusImageSelector).forEach((image) => {
+		collectFigures(image, initialFigures)
+	})
+	initialFigures.forEach(updateFigure)
 
-// add .unminus to body on every change of .isOn
-chrome.storage.onChanged.addListener(function (changes) {
-	setState(changes.isOn.newValue)
-})
-
-function handleElementsInView(selector, callback) {
-	document.querySelectorAll(selector).forEach((element) => {
-		callback(element)
+	new MutationObserver((records) => {
+		const figures = new Set()
+		for (const record of records) {
+			collectFigures(record.target, figures)
+			for (const node of record.addedNodes) {
+				if (node.nodeType !== Node.ELEMENT_NODE) continue
+				if (node.matches(plusImageSelector)) collectFigures(node, figures)
+				node.querySelectorAll(plusImageSelector).forEach((image) => {
+					collectFigures(image, figures)
+				})
+			}
+		}
+		figures.forEach(updateFigure)
+	}).observe(document.body, {
+		childList: true,
+		subtree: true,
+		attributes: true,
+		attributeFilter: ["src"],
 	})
 }
 
-function removeCollections() {
-	handleElementsInView(
-		'figure:has(img[src^="https://plus.unsplash.com"])',
-		(element) => {
-			element.classList.add("hidden")
-		}
-	)
+function setState(state) {
+	document.body.classList.toggle("unminus", state !== false)
 }
 
-// looks for collections on load
-setTimeout(removeCollections, 200)
+let stateChanged = false
+chrome.storage.onChanged.addListener(function (changes, areaName) {
+	if (areaName !== "local" || !changes.isOn) return
+	stateChanged = true
+	setState(changes.isOn.newValue)
+})
 
-// Autoremove every 100ms to handle dynamic modals
-setInterval(removeCollections, 100)
+chrome.storage.local.get(["isOn"], function (result) {
+	if (stateChanged) return
+	setState(result.isOn)
+	if (result.isOn === undefined) chrome.storage.local.set({ isOn: true })
+})
