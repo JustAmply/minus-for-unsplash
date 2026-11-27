@@ -18,6 +18,6 @@
 	},
 	"homepage": "https://github.com/morceaudebois/minus-for-unsplash#readme",
 	"dependencies": {
-		"sass": "^1.57.1"
+		"sass": "^1.108.2"
 	}
 }
